@@ -1,0 +1,26 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+E:\bldc.uvproj
+Project File Date:  12/24/2017
+
+<h2>Output:</h2>
+Build target 'BLDC'
+compiling main.c...
+linking...
+*** WARNING L1: UNRESOLVED EXTERNAL SYMBOL
+    SYMBOL:  BIT_TMP
+    MODULE:  E:\Output\main.obj (MAIN)
+*** WARNING L2: REFERENCE MADE TO UNRESOLVED EXTERNAL
+    SYMBOL:  BIT_TMP
+    MODULE:  E:\Output\main.obj (MAIN)
+    ADDRESS: 005EH
+*** WARNING L2: REFERENCE MADE TO UNRESOLVED EXTERNAL
+    SYMBOL:  BIT_TMP
+    MODULE:  E:\Output\main.obj (MAIN)
+    ADDRESS: 006BH
+Program Size: data=10.0 xdata=0 code=152
+creating hex file from "E:\Output\bldc"...
+"E:\Output\bldc" - 0 Error(s), 3 Warning(s).

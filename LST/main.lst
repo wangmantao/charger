@@ -1,0 +1,75 @@
+C51 COMPILER V9.02   MAIN                                                                  12/24/2017 21:40:50 PAGE 1   
+
+
+C51 COMPILER V9.02, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Output\main.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.exe Code\main.c BROWSE INCDIR(.\Libs\Include) DEBUG OBJECTEXTEND PRINT(.\LST\ma
+                    -in.lst) OBJECT(.\Output\main.obj)
+
+line level    source
+
+   1          #include "N76E003.h"
+   2          #include "Common.h"
+   3          #include "SFR_Macro.h"
+   4          #include "Function_define.h"
+   5          #include "Delay.h"
+   6          
+   7          /* ---------- 定义常量 --------------*/
+   8          #define STM8_FREQ_MHZ 16 
+   9          #define PWM_FREQUENCY 16000 //16K
+  10          #define PWMOUT 15                       //占空比
+  11          
+  12          /* ---------- 定义变量 --------------*/
+  13          // PWM信号周期
+  14          //static const u16 hArrPwmVal = ((u16)((STM8_FREQ_MHZ * (u32)1000000)/PWM_FREQUENCY));
+  15          
+  16          
+  17          /* ---------- 定义函数 --------------*/
+  18          // 系统时钟配置: 内部16M
+  19          void Clock_init(){
+  20   1              Set_All_GPIO_Quasi_Mode;// In Common.h define
+  21   1          set_CLOEN;
+  22   1          set_HIRCEN;                         // 高速内部RC 16M 
+  23   1      }
+  24          
+  25          void PWM_IO_init(){
+  26   1              // 下桥0有效，默认设为1
+  27   1      
+  28   1              /* 上桥1有效，默认设为0 */
+  29   1              // A pwm output ( pin_13 P1.2 PWM0/IC0 )
+  30   1              P12_PushPull_Mode;
+  31   1              //set_P1SR_2;
+  32   1      }
+  33          
+  34          
+  35          /* 定义功能函数 */
+  36          void main(){
+  37   1              unsigned int i;
+  38   1              unsigned char step = 0;
+  39   1              for (i = 0; i < 50000; ++i);
+  40   1              Clock_init();   // 时钟配置
+  41   1              PWM_IO_init();
+  42   1              while (1){
+  43   2                      // 实验一个PP端口的反转变化
+  44   2                      set_P12;
+  45   2                      for (i = 0; i < 5; ++i);
+  46   2                      clr_P12;
+  47   2                      for (i = 0; i < 5; ++i);
+  48   2              }
+  49   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    115    ----
+   CONSTANT SIZE    =   ----    ----
+C51 COMPILER V9.02   MAIN                                                                  12/24/2017 21:40:50 PAGE 2   
+
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
