@@ -47,24 +47,15 @@ static unsigned int dcv_off = 0; 		// 电压输入值
 static unsigned int dcv_on = 0; 		// 电压输入值
 static unsigned int  DCV_OFF = 1; 		// adc -> dc 电压输入
 static unsigned int DCV_ON = 5; 		// adc -> dc 电压输入
-static unsigned int adc_val = 0; 		// adc -> dc 电压输入
+static unsigned int adc_val = 0; 		// adc取样值
+static float adc_val2 = 0; 		// adc -> dc 电压输入
 static unsigned int charge_current = 0; 		// 充电电流
 static unsigned int short_current = 0; 		// 充电电流
-static bit pass = 0;			// 测试结果
+static bit pass = 1;			// 测试结果
 static bit testing = 0;			// 测试中的标记
 static bit power_offed= 0;			// 充电器退出标记(它仅有ADC控制)
 static bit power_on= 0;			// 充电器接上标记 (表示可进入测试状态，在jugement后置0)
 static bit first_boot= 1;			// 充电器接上标记
-
-/*
-static unsigned int i = 0;
-static unsigned char startOk = 0;
-static const unsigned long pwm = ((unsigned int)((STM8_FREQ_MHZ * (unsigned long)1000000)/PWM_FREQUENCY) ); // PWM周期
-const unsigned char PWM_MARSK_TABLE[6]={0x01, 0x01, 0x10, 0x10, 0x04, 0x04};
-static float PP=0.5,II=0.5,DD=0;
-static double SumError=0,PrevError=0,LastError=0;
-static int dError=0,Error=0;
-*/
 
 void chk_power_on_again(void);
 
@@ -72,47 +63,95 @@ void chk_power_on_again(void);
 /* ---------- 定义2/3(函数) --------------*/
 
 	/* ---------- 函数类1/4(中断) --------------*/
-void forDcvAdc() interrupt 11 { 		// ADC 中断, 工作时机： testing = 0 时才启动
+
+void timer0_interrupt() interrupt 3 {
+  // 停止ADC/串口工作，pass = 0, 设置 get_current_ok / recovery_ok = 1
+  /*
+  void Timer0_Delay1ms(UINT32 u32CNT)
+  {
+    clr_T0M;                                		//T0M=0, Timer0 Clock = Fsys/12
+    TMOD |= 0x01;                           		//Timer0 is 16-bit mode
+    set_TR0;                              		  //Start Timer0
+    while (u32CNT != 0)
+      {
+        TL0 = LOBYTE(TIMER_DIV12_VALUE_1ms); 		//Find  define in "Function_define.h" "TIMER VALUE"
+        TH0 = HIBYTE(TIMER_DIV12_VALUE_1ms);
+        while (TF0 != 1);                   		//Check Timer0 Time-Out Flag
+        clr_TF0;
+        u32CNT --;
+      }
+    clr_TR0;                              		  //Stop Timer0
+  }
+  */
+
+}
+
+void adc_interrupt() interrupt 11 { 		// ADC 中断, 工作时机： testing = 0 时才启动
 	// 转换ADC值, 怎么检测它是由低变高
 	// 测试结束，要拔掉电源，才能有以下动作
 	// 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
 	 adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
-	 Send_Data_To_UART1(0x55);
+   SBUF_1 = ADCRH;
+   SBUF_1 = ADCRL;
+
+   // adc_val 转数据为DEC
+   adc_val2 = adc_val/5*4095
 
 	// ~testing 测试前 用于自动开始测试 --- 充电器再次插入
 	if(~testing){
 			chk_power_on_again();
 	}
 	// testing 测试用 用于检验OCP后，测试产品的复归
-	else{					
+	else{
 	// 在复归测试中：打开ADCEN，然后delay 若干秒检查PASS。
-		if(adc_val>DCV_ON){
+		if(adc_val2>DCV_ON){
 			pass=1;
-			clr_ADCEN;				// 	开始测试，停用ADC	
+			clr_ADCEN;				// 	开始测试，停用ADC
 		}
 		else {
+      pass = 0;
 			clr_ADCF; set_ADCS;
 		}
 	}
+}
+
+// 获取电流值 UART0 中断
+void uart0_interrupt() interrupt 4 {
+  if(RI){
+    current_val[order] = SBUF;
+    if(order > 7){
+      order = 0;
+      get_current_ok =1;
+    }
+    else {
+      order ++;
+    }
+    clr_RI;
+  }
+}
+
+void uart1_interrupt() interrupt 15 {
+  if(TI_1)
+    clr_TI_1;
 }
 
 	/* ---------- 函数类2/3(配置) --------------*/
 void chk_power_on_again(){
 	// 测试结束，要拔掉电源，才能有以下动作
 	// 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
-	if (first_boot && (adc_val > DCV_ON )){ 		//case 1: 开机时有电源 -> 可以马上开始测试
+	if (first_boot && (adc_val2 > DCV_ON )){ 		//case 1: 开机时有电源 -> 可以马上开始测试
 		power_on = 1;
-		clr_ADCEN;			// 开始测试，停用ADC	
+		clr_ADCEN;			// 开始测试，停用ADC
 	}
-	else {										//case 2: 开机时无电源 -> 同一般情况 ->先检测有低，再检测有高 
-		if (adc_val < DCV_OFF){					//		判断poweroffed的两种情况
+	else {										//case 2: 开机时无电源 -> 同一般情况 ->先检测有低，再检测有高
+		if (adc_val2 < DCV_OFF){					//		判断poweroffed的两种情况
 			power_offed = 1;
 		}
 		else{
 			power_offed = 0;
 		}
 
-		if(power_offed && (adc_val > DCV_ON)){   // 		由power_offed的决定是否 power_on
+		if(power_offed && (adc_val2 > DCV_ON)){   // 		由power_offed的决定是否 power_on
 			power_on = 1;
 			clr_ADCEN;			// 开始测试，停用ADC	
 		}
@@ -168,35 +207,60 @@ void do_a_judgement(){
 	// 3. 重新开始ADC侦测(开启ADC中断)
 	//ADCF ADCS ADCEN 相关寄存器3个
 	set_ADCEN;
-	set_ADCS;		
+	set_ADCS;
+}
+
+void send_cmd(){
 }
 
 void test_flow(){
+  float current = 0;
+  float re_dcv = 0;
+  pass = 1;
 	testing = 1;  			// 标记进入测试中
 	reset_judgement();		// 进入测试状诚后，OK/NG继电器复位
 
- 	// 开起定时器等待7秒，定时器中断里执行电流读数
-    //直接调用定时器delay函数
-    // 用串口读取电流数，写入电流变量 charge_current
-    // ocp 复归
 
+  //RATE
+  Timer0_Delay1ms(7000);
+  get_current_ok = 0;
+  send_cmd();
+  timer0_monitor_start();
+  while(~get_current_ok);
+  timer0_monitor_stop();
+  current = (1+2)/3;  // 实要用上 current_val
+  if(~pass || current < 0.8){
+    pass = 0; do_a_judgement(); return;
+  }
 
-    Timer0_Delay1ms(1000);       //等一秒做标识
-    SHORT_ON;
-    Timer0_Delay1ms(1000);       //等一秒做标识
-    // chk the current when OCP
-    SHORT_OFF;
-    // chk dcv recove after Ocp
-    set_ADCEN; set_ADCS;
+  //SHORT
+  Timer0_Delay1ms(1000);
+  get_current_ok = 0;
+  SHORT_ON;             // shorted
+  Timer0_Delay1ms(2000);
+  send_cmd();
+  timer0_monitor_start();
+  while(~get_current_ok);
+  timer0_monitor_stop();
+  current = (1+2)/3;  // 实要用上 current_val
+  if( ~pass || current > 0.02){
+    pass = 0; do_a_judgement(); SHORT_OFF; return;
+  }
 
-
-	// 由以上程序为pass赋的值，决断结果
-    Timer0_Delay1ms(1000);       //等一秒做标识
-	
-    if (~pass){
-    	clr_ADCEN;
-    }
+  //OCP
+  SHORT_OFF;
+  let;
+  set_ADCEN; set_ADCS; // 在中断中关闭
+  timer0_monitor_start();
+  while(~recovery_ok);
+  timer0_monitor_stop();
+  re_dcv = 123;
+  if(~pass || re_dcv < 5){
+    pass = 0; do_a_judgement();return;
+  }
 	do_a_judgement();
+
+  // 为防止以上while无限等待，while之前启用定时器，检查超时。（要用timer0)
 }
 
 
@@ -225,11 +289,15 @@ void main(){
 
 	InitialUART1_Timer3(115200);
 
-	// 循环测试中
+  // 测试ADC工作状态
+  // ADC完成后，检查电压的数据有效性
+  // 电压有效后，插拔控制继电器的ON/OFF
+  //取电流数据，用串口0
 	while (1){
 		 if(~testing && power_on){
 		 	testing = 1;  // 标记进入测试中
-		 	test_flow();
+		 	//test_flow();
+      Send_Data_To_U
 		 }
 	}
 }
