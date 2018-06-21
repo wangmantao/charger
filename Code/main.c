@@ -9,7 +9,8 @@
 
 /* ------ kiell 中引用基础头文件 --------*/
 #include "N76E003.h"
-#include "Common.h"
+#include "common.h"
+#include "delay.h"
 #include "SFR_Macro.h"
 #include "Function_define.h"
 
@@ -38,12 +39,14 @@
 #define SHORT_MAX_CURRENT 20 	// unit:mA
 
 //判断电源有无的参考
-#define DCV_OFF 1;				// 1v以下为OFF
-#define DCV_ON 5;				// 5v以上为ON
+//#define DCV_OFF 1;				// 1v以下为OFF
+//#define DCV_ON 5;				// 5v以上为ON
 
 /* ---------- 定义2/3(变量) --------------*/
 static unsigned int dcv_off = 0; 		// 电压输入值
 static unsigned int dcv_on = 0; 		// 电压输入值
+static unsigned int  DCV_OFF = 1; 		// adc -> dc 电压输入
+static unsigned int DCV_ON = 5; 		// adc -> dc 电压输入
 static unsigned int adc_val = 0; 		// adc -> dc 电压输入
 static unsigned int charge_current = 0; 		// 充电电流
 static unsigned int short_current = 0; 		// 充电电流
@@ -63,39 +66,41 @@ static double SumError=0,PrevError=0,LastError=0;
 static int dError=0,Error=0;
 */
 
+void chk_power_on_again(void);
+
+
 /* ---------- 定义2/3(函数) --------------*/
 
 	/* ---------- 函数类1/4(中断) --------------*/
-void forDcvAdc() interrupt 16 { 		// ADC 中断, 工作时机： testing = 0 时才启动
+void forDcvAdc() interrupt 11 { 		// ADC 中断, 工作时机： testing = 0 时才启动
 	// 转换ADC值, 怎么检测它是由低变高
 	// 测试结束，要拔掉电源，才能有以下动作
 	// 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
-
-	adc_val = ADCRH; hv <<= 4; hv |= (ADCRL & 0X0F);  // 16h -> dec
+	 adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
+	 Send_Data_To_UART1(0x55);
 
 	// ~testing 测试前 用于自动开始测试 --- 充电器再次插入
-	if(~testing)
-		chk_power_on_again();
-
+	if(~testing){
+			chk_power_on_again();
+	}
 	// testing 测试用 用于检验OCP后，测试产品的复归
-	if(testing){					// 在复归测试中：打开ADCEN，然后delay 若干秒检查PASS。
-		if (adc_val > DCV_ON){
-			pass =  1;
+	else{					
+	// 在复归测试中：打开ADCEN，然后delay 若干秒检查PASS。
+		if(adc_val>DCV_ON){
+			pass=1;
 			clr_ADCEN;				// 	开始测试，停用ADC	
-		}else {
+		}
+		else {
 			clr_ADCF; set_ADCS;
 		}
-
 	}
-
-
 }
 
 	/* ---------- 函数类2/3(配置) --------------*/
 void chk_power_on_again(){
 	// 测试结束，要拔掉电源，才能有以下动作
 	// 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
-	if (first_boot && adc_val > DCV_ON ){ 		//case 1: 开机时有电源 -> 可以马上开始测试
+	if (first_boot && (adc_val > DCV_ON )){ 		//case 1: 开机时有电源 -> 可以马上开始测试
 		power_on = 1;
 		clr_ADCEN;			// 开始测试，停用ADC	
 	}
@@ -107,7 +112,7 @@ void chk_power_on_again(){
 			power_offed = 0;
 		}
 
-		if(power_offed && adc_val > DCV_ON){   // 		由power_offed的决定是否 power_on
+		if(power_offed && (adc_val > DCV_ON)){   // 		由power_offed的决定是否 power_on
 			power_on = 1;
 			clr_ADCEN;			// 开始测试，停用ADC	
 		}
@@ -116,16 +121,6 @@ void chk_power_on_again(){
 			clr_ADCF; set_ADCS;
 		}
 	}
-}
-
-void clkConf(){				// 系统时钟配置: 内部16M (default)
-	set_HIRCEN; 			// (sysClk = 16M)
-}
-
-void adcConf(){
-	// EA 启用ADC中断
-	set_ADCEN;
-	set_ADCS;
 }
 
 void ioConf(){
@@ -185,9 +180,10 @@ void test_flow(){
     // 用串口读取电流数，写入电流变量 charge_current
     // ocp 复归
 
-    delay1ms();
+
+    Timer0_Delay1ms(1000);       //等一秒做标识
     SHORT_ON;
-    delay1ms();
+    Timer0_Delay1ms(1000);       //等一秒做标识
     // chk the current when OCP
     SHORT_OFF;
     // chk dcv recove after Ocp
@@ -195,7 +191,8 @@ void test_flow(){
 
 
 	// 由以上程序为pass赋的值，决断结果
-    delay1ms();
+    Timer0_Delay1ms(1000);       //等一秒做标识
+	
     if (~pass){
     	clr_ADCEN;
     }
@@ -216,7 +213,17 @@ void main(){
 	NG_OFF;
 	SHORT_OFF;
 	CHARGE_OFF;
-	adcConf();
+
+	set_ES;
+	set_ES_1;
+	set_EADC;
+	set_EA;	
+
+	clr_ADCF;
+	set_ADCEN;
+	set_ADCS;
+
+	InitialUART1_Timer3(115200);
 
 	// 循环测试中
 	while (1){
@@ -224,6 +231,5 @@ void main(){
 		 	testing = 1;  // 标记进入测试中
 		 	test_flow();
 		 }
-
 	}
 }

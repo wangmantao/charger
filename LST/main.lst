@@ -1,74 +1,267 @@
-C51 COMPILER V9.02   MAIN                                                                  12/24/2017 21:40:50 PAGE 1   
+C51 COMPILER V9.02   MAIN                                                                  06/21/2018 01:34:27 PAGE 1   
 
 
 C51 COMPILER V9.02, COMPILATION OF MODULE MAIN
 OBJECT MODULE PLACED IN .\Output\main.obj
-COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.exe Code\main.c BROWSE INCDIR(.\Libs\Include) DEBUG OBJECTEXTEND PRINT(.\LST\ma
-                    -in.lst) OBJECT(.\Output\main.obj)
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Code\main.c BROWSE INCDIR(.\Libs\Include) DEFINE(FOSC_160000) DEBUG OBJECTE
+                    -XTEND PRINT(.\LST\main.lst) OBJECT(.\Output\main.obj)
 
 line level    source
 
-   1          #include "N76E003.h"
-   2          #include "Common.h"
-   3          #include "SFR_Macro.h"
-   4          #include "Function_define.h"
-   5          #include "Delay.h"
+   1          /*
+   2             FOR Charger 2018
+   3             --Pin configure--
+   4                  串口1 串口2  Relay1 Relay2  Relay3 Relay4
+   5                                (L-short) (ok)    (ng)    (保护表头)
    6          
-   7          /* ---------- 定义常量 --------------*/
-   8          #define STM8_FREQ_MHZ 16 
-   9          #define PWM_FREQUENCY 16000 //16K
-  10          #define PWMOUT 15                       //占空比
-  11          
-  12          /* ---------- 定义变量 --------------*/
-  13          // PWM信号周期
-  14          //static const u16 hArrPwmVal = ((u16)((STM8_FREQ_MHZ * (u32)1000000)/PWM_FREQUENCY));
-  15          
+   7          
+   8          */
+   9          
+  10          /* ------ kiell 中引用基础头文件 --------*/
+  11          #include "N76E003.h"
+  12          #include "common.h"
+  13          #include "delay.h"
+  14          #include "SFR_Macro.h"
+  15          #include "Function_define.h"
   16          
-  17          /* ---------- 定义函数 --------------*/
-  18          // 系统时钟配置: 内部16M
-  19          void Clock_init(){
-  20   1              Set_All_GPIO_Quasi_Mode;// In Common.h define
-  21   1          set_CLOEN;
-  22   1          set_HIRCEN;                         // 高速内部RC 16M 
-  23   1      }
-  24          
-  25          void PWM_IO_init(){
-  26   1              // 下桥0有效，默认设为1
-  27   1      
-  28   1              /* 上桥1有效，默认设为0 */
-  29   1              // A pwm output ( pin_13 P1.2 PWM0/IC0 )
-  30   1              P12_PushPull_Mode;
-  31   1              //set_P1SR_2;
-  32   1      }
-  33          
-  34          
-  35          /* 定义功能函数 */
-  36          void main(){
-  37   1              unsigned int i;
-  38   1              unsigned char step = 0;
-  39   1              for (i = 0; i < 50000; ++i);
-  40   1              Clock_init();   // 时钟配置
-  41   1              PWM_IO_init();
-  42   1              while (1){
-  43   2                      // 实验一个PP端口的反转变化
-  44   2                      set_P12;
-  45   2                      for (i = 0; i < 5; ++i);
-  46   2                      clr_P12;
-  47   2                      for (i = 0; i < 5; ++i);
-  48   2              }
-  49   1      }
+  17          /* ---------- 定义1/3(常量) --------------*/
+  18          
+  19          
+  20          // OK信号
+  21          #define OK_ON set_P10
+  22          #define OK_OFF clr_P10
+  23          // NG信号
+  24          #define NG_ON set_P11
+  25          #define NG_OFF clr_P11
+  26          // 短路开关
+  27          #define SHORT_ON set_P12
+  28          #define SHORT_OFF clr_P12
+  29          // 充电开关
+  30          #define CHARGE_ON set_P13
+  31          #define CHARGE_OFF clr_P13
+  32          
+  33          // 定格电流待测时间 (插入几秒后开始测)
+  34          #define RATE_DELAY_TIME 7               // unit:秒
+  35          #define RATE_MIN_CURRENT 500    // unit:mA
+  36          
+  37          // 定格电流维持时间 (电流值检出后，几称后转入短路测试)
+  38          #define SHORT_DELAY_TIME 7              // unit:秒
+  39          #define SHORT_MAX_CURRENT 20    // unit:mA
+  40          
+  41          //判断电源有无的参考
+  42          //#define DCV_OFF 1;                            // 1v以下为OFF
+  43          //#define DCV_ON 5;                             // 5v以上为ON
+  44          
+  45          /* ---------- 定义2/3(变量) --------------*/
+  46          static unsigned int dcv_off = 0;                // 电压输入值
+  47          static unsigned int dcv_on = 0;                 // 电压输入值
+  48          static unsigned int  DCV_OFF = 1;               // adc -> dc 电压输入
+  49          static unsigned int DCV_ON = 5;                 // adc -> dc 电压输入
+  50          static unsigned int adc_val = 0;                // adc -> dc 电压输入
+  51          static unsigned int charge_current = 0;                 // 充电电流
+  52          static unsigned int short_current = 0;          // 充电电流
+  53          static bit pass = 0;                    // 测试结果
+  54          static bit testing = 0;                 // 测试中的标记
+C51 COMPILER V9.02   MAIN                                                                  06/21/2018 01:34:27 PAGE 2   
+
+  55          static bit power_offed= 0;                      // 充电器退出标记(它仅有ADC控制)
+  56          static bit power_on= 0;                 // 充电器接上标记 (表示可进入测试状态，在jugement后置0)
+  57          static bit first_boot= 1;                       // 充电器接上标记
+  58          
+  59          /*
+  60          static unsigned int i = 0;
+  61          static unsigned char startOk = 0;
+  62          static const unsigned long pwm = ((unsigned int)((STM8_FREQ_MHZ * (unsigned long)1000000)/PWM_FREQUENCY) )
+             -; // PWM周期
+  63          const unsigned char PWM_MARSK_TABLE[6]={0x01, 0x01, 0x10, 0x10, 0x04, 0x04};
+  64          static float PP=0.5,II=0.5,DD=0;
+  65          static double SumError=0,PrevError=0,LastError=0;
+  66          static int dError=0,Error=0;
+  67          */
+  68          
+  69          void chk_power_on_again(void);
+  70          
+  71          
+  72          /* ---------- 定义2/3(函数) --------------*/
+  73          
+  74                  /* ---------- 函数类1/4(中断) --------------*/
+  75          void forDcvAdc() interrupt 11 {                 // ADC 中断, 工作时机： testing = 0 时才启动
+  76   1              // 转换ADC值, 怎么检测它是由低变高
+  77   1              // 测试结束，要拔掉电源，才能有以下动作
+  78   1              // 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
+  79   1               adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
+  80   1               Send_Data_To_UART1(0x55);
+  81   1      
+  82   1              // ~testing 测试前 用于自动开始测试 --- 充电器再次插入
+  83   1              if(~testing){
+  84   2                              chk_power_on_again();
+  85   2              }
+  86   1              // testing 测试用 用于检验OCP后，测试产品的复归
+  87   1              else{                                   
+  88   2              // 在复归测试中：打开ADCEN，然后delay 若干秒检查PASS。
+  89   2                      if(adc_val>DCV_ON){
+  90   3                              pass=1;
+  91   3                              clr_ADCEN;                              //      开始测试，停用ADC        
+  92   3                      }
+  93   2                      else {
+  94   3                              clr_ADCF; set_ADCS;
+  95   3                      }
+  96   2              }
+  97   1      }
+  98          
+  99                  /* ---------- 函数类2/3(配置) --------------*/
+ 100          void chk_power_on_again(){
+ 101   1              // 测试结束，要拔掉电源，才能有以下动作
+ 102   1              // 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
+ 103   1              if (first_boot && (adc_val > DCV_ON )){                 //case 1: 开机时有电源 -> 可以马上开始测试
+ 104   2                      power_on = 1;
+ 105   2                      clr_ADCEN;                      // 开始测试，停用ADC     
+ 106   2              }
+ 107   1              else {                                                                          //case 2: 开机时无电源 -> 同一般情况 ->先检测有低，再检测有高 
+ 108   2                      if (adc_val < DCV_OFF){                                 //              判断poweroffed的两种情况
+ 109   3                              power_offed = 1;
+ 110   3                      }
+ 111   2                      else{
+ 112   3                              power_offed = 0;
+ 113   3                      }
+ 114   2      
+ 115   2                      if(power_offed && (adc_val > DCV_ON)){   //             由power_offed的决定是否 power_on
+C51 COMPILER V9.02   MAIN                                                                  06/21/2018 01:34:27 PAGE 3   
+
+ 116   3                              power_on = 1;
+ 117   3                              clr_ADCEN;                      // 开始测试，停用ADC     
+ 118   3                      }
+ 119   2      
+ 120   2                      if(~power_on){                                                  // 以上没有产生有效的power_on, 继续ADC
+ 121   3                              clr_ADCF; set_ADCS;
+ 122   3                      }
+ 123   2              }
+ 124   1      }
+ 125          
+ 126          void ioConf(){
+ 127   1              //  准双向，已经在串口初始化定义
+ 128   1              //串口1  p06 / p07
+ 129   1              //串口2  p16 /p02
+ 130   1      
+ 131   1              P10_PushPull_Mode;                      // Relay 1 control - for ok -> p10
+ 132   1              P11_PushPull_Mode;                      // Relay 2 control - for ng -> p11
+ 133   1              P12_PushPull_Mode;                      // Relay 3 control - for short -> p12
+ 134   1              P13_PushPull_Mode;                      // Relay 4 control - for charge -> p13
+ 135   1      
+ 136   1              Enable_ADC_AIN0;                        // AIN0 P17
+ 137   1      
+ 138   1              //P03_PushPull_Mode;                    // Relay 4 control - for protect 
+ 139   1              //P03_PushPull_Mode;                    //  - for start test
+ 140   1              //P05_Input_Mode;                               // 定义模拟采样输入
+ 141   1      }
+ 142          
+ 143          
+ 144                  /* ---------- 函数类3/3(功能) --------------*/
+ 145          
+ 146          void reset_judgement(){
+ 147   1              OK_OFF; NG_OFF; // ok Relay =0 ; ng Relay = 0;
+ 148   1      }
+ 149          
+ 150          void do_a_judgement(){
+ 151   1              // step1 充电电流
+ 152   1              // step2 短路电流
+ 153   1              // step3 复归 (要用上ADC)
+ 154   1              // 1. 输出测试结果(先置0再置1, 防止两个同时有效）
+ 155   1              if(pass){
+ 156   2                      NG_OFF; 
+ 157   2                      OK_ON;
+ 158   2              }
+ 159   1              else {
+ 160   2                      OK_OFF; 
+ 161   2                      NG_ON;
+ 162   2              }
+ 163   1              // 2. 设测试结束标记 & 待开始新一轮充电插入检测
+ 164   1              first_boot = 0;
+ 165   1              testing = 0;
+ 166   1              power_on = 0; 
+ 167   1      
+ 168   1              // 3. 重新开始ADC侦测(开启ADC中断)
+ 169   1              //ADCF ADCS ADCEN 相关寄存器3个
+ 170   1              set_ADCEN;
+ 171   1              set_ADCS;               
+ 172   1      }
+ 173          
+ 174          void test_flow(){
+ 175   1              testing = 1;                    // 标记进入测试中
+ 176   1              reset_judgement();              // 进入测试状诚后，OK/NG继电器复位
+ 177   1      
+C51 COMPILER V9.02   MAIN                                                                  06/21/2018 01:34:27 PAGE 4   
+
+ 178   1              // 开起定时器等待7秒，定时器中断里执行电流读数
+ 179   1          //直接调用定时器delay函数
+ 180   1          // 用串口读取电流数，写入电流变量 charge_current
+ 181   1          // ocp 复归
+ 182   1      
+ 183   1      
+ 184   1          Timer0_Delay1ms(1000);       //等一秒做标识
+ 185   1          SHORT_ON;
+ 186   1          Timer0_Delay1ms(1000);       //等一秒做标识
+ 187   1          // chk the current when OCP
+ 188   1          SHORT_OFF;
+ 189   1          // chk dcv recove after Ocp
+ 190   1          set_ADCEN; set_ADCS;
+ 191   1      
+ 192   1      
+ 193   1              // 由以上程序为pass赋的值，决断结果
+ 194   1          Timer0_Delay1ms(1000);       //等一秒做标识
+ 195   1              
+ 196   1          if (~pass){
+ 197   2              clr_ADCEN;
+ 198   2          }
+ 199   1              do_a_judgement();
+ 200   1      }
+ 201          
+ 202          
+ 203          /*
+ 204          流程说明：
+ 205          上电检查有没有输出
+ 206          输出有，用relay 接上电池
+ 207          等待8秒 （常量）
+ 208          */
+ 209          void main(){
+ 210   1              // 初始化
+ 211   1              ioConf();       
+ 212   1              OK_OFF;
+ 213   1              NG_OFF;
+ 214   1              SHORT_OFF;
+ 215   1              CHARGE_OFF;
+ 216   1      
+ 217   1              set_ES;
+ 218   1              set_ES_1;
+ 219   1              set_EADC;
+ 220   1              set_EA; 
+ 221   1      
+ 222   1              clr_ADCF;
+ 223   1              set_ADCEN;
+ 224   1              set_ADCS;
+ 225   1      
+ 226   1              InitialUART1_Timer3(115200);
+ 227   1      
+ 228   1              // 循环测试中
+ 229   1              while (1){
+ 230   2                       if(~testing && power_on){
+ 231   3                              testing = 1;  // 标记进入测试中
+ 232   3                              test_flow();
+ 233   3                       }
+ 234   2              }
+ 235   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =    115    ----
-   CONSTANT SIZE    =   ----    ----
-C51 COMPILER V9.02   MAIN                                                                  12/24/2017 21:40:50 PAGE 2   
+   CODE SIZE        =    375    ----
+C51 COMPILER V9.02   MAIN                                                                  06/21/2018 01:34:27 PAGE 5   
 
+   CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =   ----       1
+   DATA SIZE        =     14    ----
    IDATA SIZE       =   ----    ----
-   BIT SIZE         =   ----    ----
+   BIT SIZE         =      5    ----
 END OF MODULE INFORMATION.
 
 

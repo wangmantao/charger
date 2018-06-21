@@ -1,0 +1,1 @@
+"Libs\Common\Delay.c" BROWSE INCDIR(.\Libs\Include) DEFINE (FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\LST\Delay.lst) OBJECT(.\Output\Delay.obj)
