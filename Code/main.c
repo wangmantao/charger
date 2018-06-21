@@ -38,6 +38,7 @@
 #define SHORT_DELAY_TIME 7 		// unit:秒
 #define SHORT_MAX_CURRENT 20 	// unit:mA
 
+
 //判断电源有无的参考
 //#define DCV_OFF 1;				// 1v以下为OFF
 //#define DCV_ON 5;				// 5v以上为ON
@@ -56,6 +57,10 @@ static bit testing = 0;			// 测试中的标记
 static bit power_offed= 0;			// 充电器退出标记(它仅有ADC控制)
 static bit power_on= 0;			// 充电器接上标记 (表示可进入测试状态，在jugement后置0)
 static bit first_boot= 1;			// 充电器接上标记
+static bit get_current_ok= 0;			// 已测试电流标记
+static bit recovery_ok= 0;			// 已测试电流标记
+static UINT8 order = 0;
+static UINT8 current_val[8] ={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 void chk_power_on_again(void);
 
@@ -90,12 +95,15 @@ void adc_interrupt() interrupt 11 { 		// ADC 中断, 工作时机： testing = 0
 	// 转换ADC值, 怎么检测它是由低变高
 	// 测试结束，要拔掉电源，才能有以下动作
 	// 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
-	 adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
-   SBUF_1 = ADCRH;
-   SBUF_1 = ADCRL;
-
+	//adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
+    //SBUF = ADCRH;
+    //SBUF = ADCRL;
+   	 //SBUF = 0x55;
+   	 P12= ~P12;
+   	 clr_ADCF;
+   /*
    // adc_val 转数据为DEC
-   adc_val2 = adc_val/5*4095
+   adc_val2 = adc_val/5*4095;
 
 	// ~testing 测试前 用于自动开始测试 --- 充电器再次插入
 	if(~testing){
@@ -113,6 +121,7 @@ void adc_interrupt() interrupt 11 { 		// ADC 中断, 工作时机： testing = 0
 			clr_ADCF; set_ADCS;
 		}
 	}
+	*/
 }
 
 // 获取电流值 UART0 中断
@@ -128,13 +137,20 @@ void uart0_interrupt() interrupt 4 {
     }
     clr_RI;
   }
+  if(TI){
+  	clr_TI;
+  	//clr_ADCF;
+  	//set_ADCS;
+  }
 }
-
+/*
 void uart1_interrupt() interrupt 15 {
-  if(TI_1)
-    clr_TI_1;
+  if(TI) {
+		P13 = ~P13;
+  		//clr_TI;
+  }
 }
-
+*/
 	/* ---------- 函数类2/3(配置) --------------*/
 void chk_power_on_again(){
 	// 测试结束，要拔掉电源，才能有以下动作
@@ -171,6 +187,7 @@ void ioConf(){
 	P11_PushPull_Mode; 			// Relay 2 control - for ng -> p11
 	P12_PushPull_Mode; 			// Relay 3 control - for short -> p12
 	P13_PushPull_Mode; 			// Relay 4 control - for charge -> p13
+	P04_PushPull_Mode; 			// ADC Triggle source
 
 	Enable_ADC_AIN0;			// AIN0 P17
 
@@ -181,6 +198,14 @@ void ioConf(){
 
 
 	/* ---------- 函数类3/3(功能) --------------*/
+
+ void timer0_monitor_start(){
+
+ }
+
+ void timer0_monitor_stop(){
+
+ }
 
 void reset_judgement(){
 	OK_OFF; NG_OFF;	// ok Relay =0 ; ng Relay = 0;
@@ -249,7 +274,6 @@ void test_flow(){
 
   //OCP
   SHORT_OFF;
-  let;
   set_ADCEN; set_ADCS; // 在中断中关闭
   timer0_monitor_start();
   while(~recovery_ok);
@@ -277,27 +301,46 @@ void main(){
 	NG_OFF;
 	SHORT_OFF;
 	CHARGE_OFF;
-
-	set_ES;
+	P04=0;
+  Timer0_Delay1ms(1000);
+  /*
 	set_ES_1;
+*/
+  /*
+	set_ES;
 	set_EADC;
-	set_EA;	
-
+	set_ETGSEL0;
+	set_ETGSEL1;
 	clr_ADCF;
 	set_ADCEN;
 	set_ADCS;
 
-	InitialUART1_Timer3(115200);
+	set_EA;	
 
+*/
+	//InitialUART0_Timer1(115200);
+	//InitialUART1_Timer3(115200);
   // 测试ADC工作状态
   // ADC完成后，检查电压的数据有效性
   // 电压有效后，插拔控制继电器的ON/OFF
   //取电流数据，用串口0
 	while (1){
+		/*
 		 if(~testing && power_on){
 		 	testing = 1;  // 标记进入测试中
 		 	//test_flow();
-      Send_Data_To_U
 		 }
+		*/
+		//SBUF = 0X33;
+		//SBUF_1 = 0X34;
+
+	//adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
+    //SBUF = ADCRH;
+    //SBUF = ADCRL;
+    Timer0_Delay1ms(1000);
+    P04=1;
+    P13=~P13;
+    P04=0;
+				
 	}
 }
