@@ -42,8 +42,9 @@
 
 
 /* ---------- 定义2/3(变量) --------------*/
-static unsigned int DCV_OFF = 272; 		// 电压输入有没有下限 (1v) (1/3v)/5v *4095 (因为取样分压1/3)
+static unsigned int DCV_OFF = 1228; 		// 电压输入有没有下限 (4.5v) (4.5/3v)/5v *4095 (因为取样分压1/3)
 static unsigned int DCV_ON = 1638; 		// 电压输入有没有上限 (6v) (6/3v)/5v *4095 (因为取样分压1/3)
+static unsigned int DCV_BAT = 1092; 		// battery (4v) (4/3v)/5v *4095 (因为取样分压1/3)
 static unsigned int adc_val = 0; 		// adc取样值
 //static float adc_val2 = 0; 		// adc -> dc 电压输入
 static unsigned int charge_current = 0; 		// 充电电流
@@ -61,6 +62,7 @@ static bit this_comp_low= 0;
 static bit last_comp_low= 0;
 static bit this_comp_hi= 0;
 static bit last_comp_hi= 0;
+static bit bat_out_ok= 0;
 
 static UINT8 order = 0;
 static UINT8 timer0_couter= 0;
@@ -98,14 +100,20 @@ void adc_interrupt() interrupt 11 {
 	if(~testing){					//开始测试前，插入电源检测用此段
 		chk_power_on_again();
 	}
-	else{							// 复归测试开启ADC运行此段 
-		if(adc_val>DCV_ON){			// 复归成功
-			pass=1;					// 此测试品PASS 
-			recovery_ok = 1;
-			clr_ADCEN;				// 	开始测试，停用ADC
+	else{							// 电池输出检测, 等待操作员按钮，没有超时限制
+		if(adc_val>DCV_BAT && P13 == 1 ){			//  放电的下降值，和电池的检测值 ，用同样的4.5V。p13=CHARGE 常闭打开，不充电
+
+			if(adc_count > 50000){					// 1.5秒持续高
+				adc_count = 0;
+				bat_out_ok = 1;
+				clr_ADCEN;				// 	开始测试，停用ADC
+			}
+			else{
+	      		adc_count++;
+				clr_ADCF; set_ADCS;		//没有复归，接着ADC检测				
+			}
 		}
 		else {
-      		pass = 0;
 			clr_ADCF; set_ADCS;		//没有复归，接着ADC检测
 		}
 
@@ -208,7 +216,11 @@ void ioConf(){
 	P11_PushPull_Mode; 			// Relay 2 control - for ng -> p11
 	P12_PushPull_Mode; 			// Relay 3 control - for short -> p12
 	P13_PushPull_Mode; 			// Relay 4 control - for charge -> p13
-	//P04_PushPull_Mode; 			// ADC Triggle source
+	P03_Quasi_Mode;				// ng_reset
+	P04_Quasi_Mode;				// sys_reset
+	set_P03;
+	set_P04;
+
 
 	Enable_ADC_AIN0;			// AIN0 P17
 
@@ -301,7 +313,7 @@ void test_flow(){
   if(~pass || tempV < 0x01F4){  // < 0.5A
   //if(~pass || tempV < 0x044c){  // < 1.1A
   // if(~pass || tempV < 0x03e8){  // < 1.0A
-  //if(~pass || tempV < 0x0384){  // < .90A
+  //if(~pass || tempV < 0x0384){  // < .90A  
   	//发送定格有问题0xF1, 检测NG波形 和short波形
     pass = 0; do_a_judgement(); 
     return;   // ----> return
@@ -311,9 +323,19 @@ void test_flow(){
   // 手动开机
   //  短路
   CHARGE_OFF;
-  Timer0_Delay1ms(10000); //保留看电流的时间
-  SHORT_ON;             // shorted
-  Timer0_Delay1ms(11500); //保留看电流的时间
+  Timer0_Delay1ms(1500); //保留看电流的时间
+  // Whaiting for bat. output by manule
+  SHORT_ON;
+  Timer0_Delay1ms(300); //保留看电流的时间
+  SHORT_OFF;
+
+  set_ADCEN; clr_ADCF;
+  set_ADCS; set_ADCEN;
+  //此时电压值 > 4.8V < 8V,持续1秒钟，表示BAT,OK
+  bat_out_ok =0;
+  while(~bat_out_ok);
+ SHORT_ON;             // shorted
+  Timer0_Delay1ms(2000); //保留看电流的时间
 
   get_current_ok = 0;
   timer0_monitor_start();
@@ -326,32 +348,38 @@ void test_flow(){
   if(get_current_ok){
   	tempV = current_val[5]; tempV <<= 8; tempV |= (current_val[4] & 0xFF);
   } 
+  //tempV = 0x0003;
+  //pass = 1;
   if(~pass || tempV > 0x0014){  // < 0.02A
-
 	Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
     pass = 0; do_a_judgement(); SHORT_OFF; return; // ---> return (ng shorted cancel)
   }
-  Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
+
 
   // ----------------------------------------------- Output Recovery
- 
-  SHORT_OFF; //OK shorted cancel
-
   /*
-  set_ADCEN; set_ADCS; // 检验复归
-  recovery_ok = 0;
-  timer0_monitor_start();
+  CHARGE_ON;            //利用（ADC: testing ==1 || P13 ==0) 
+  Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
+ set_ADCEN; clr_ADCF;
+  set_ADCS; set_ADCEN;
+  //此时电压值 > 4.8V < 8V,持续1秒钟，表示BAT,OK
+  recovery_ok =0;
   while(~recovery_ok);
-  timer0_monitor_stop();
+  if(~pass){  // < 0.02A
+	Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
+    pass = 0; do_a_judgement(); SHORT_OFF; return; // ---> return (ng shorted cancel)
+  }   
 	*/
-  recovery_ok = 1;
+  SHORT_OFF; //OK shorted cancel
+  do_a_judgement();
+}
 
-  if(~pass || ~recovery_ok){ 		// < 6v
-  	clr_ADCEN;
-    pass = 0; do_a_judgement();return;
-  }
+void sys_reset(){
+	set_SWRST;	
+}
 
-	do_a_judgement();
+void ng_relay_reset(){
+	NG_OFF;
 }
 
 
@@ -393,8 +421,14 @@ void main(){
 			test_flow();
 		}
 		Timer0_Delay1ms(500);
-		//SBUF = 0X33;
-		//SBUF_1 = 0X34;
+
+		if(P03 == 0){
+			ng_reset();
+		}
+
+		if(P04 == 0) {
+			sys_reset();
+		}
 	
 	}
 }
