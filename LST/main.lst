@@ -1,4 +1,4 @@
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 1   
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 1   
 
 
 C51 COMPILER V9.02, COMPILATION OF MODULE MAIN
@@ -8,7 +8,7 @@ COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Code\main.c BROWSE INCDIR(.\Libs\In
 
 line level    source
 
-   1          /*
+   1          /*                                                                                                        
    2             FOR Charger 2018
    3             --Pin configure--
    4                  串口1 串口2  Relay1 Relay2  Relay3 Relay4
@@ -56,42 +56,44 @@ line level    source
              -�分压1/3)
   46          static unsigned int DCV_ON = 1638;              // 电压输入有没有上限 (6v) (6/3v)/5v *4095 (因为取样分�
              -��1/3)
-  47          static unsigned int DCV_BAT = 1092;             // battery (4v) (4/3v)/5v *4095 (因为取样分压1/3)
-  48          static unsigned int adc_val = 0;                // adc取样值
-  49          //static float adc_val2 = 0;            // adc -> dc 电压输入
-  50          static unsigned int charge_current = 0;                 // 充电电流
-  51          static unsigned int short_current = 0;          // 充电电流
-  52          static bit pass = 1;                    // 测试结果
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 2   
+  47          static unsigned int DCV_BAT = 1092;             // battery (4v) (4/3v)/5v *4095 (因为取样分压1/3)--开启检�
+             -�用
+  48          static unsigned int DCV_BAT_DOWN = 273;        // battery (1v) (1/3v)/5v *4095 (因为取样分压1/3)--�
+             -�路检验用
+  49          static unsigned int adc_val = 0;                // adc取样值
+  50          //static float adc_val2 = 0;            // adc -> dc 电压输入
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 2   
 
-  53          static bit testing = 0;                 // 测试中的标记
-  54          static bit power_offed= 0;                      // 充电器退出标记(它仅有ADC控制)
-  55          static bit power_on= 0;                 // 充电器接上标记 (表示可进入测试状态，在jugement后置0)
-  56          static bit first_boot= 1;                       // 充电器接上标记
-  57          static bit get_current_ok= 0;                   // 已测试电流标记
-  58          static bit time_out= 0;                         // 等待中断取数据超时
-  59          static bit recovery_ok= 0;                      // 复归确认标记
-  60          static bit adcv_ok = 0;
-  61          static bit this_comp_low= 0;
-  62          static bit last_comp_low= 0;
-  63          static bit this_comp_hi= 0;
-  64          static bit last_comp_hi= 0;
-  65          static bit bat_out_ok= 0;
-  66          
-  67          static UINT8 order = 0;
-  68          static UINT8 timer0_couter= 0;
-  69          static UINT8 current_val[8] ={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-  70          static UINT8 adc_res[3] = {0x00,0x00, 0x00};
-  71          static UINT8 cmd[6] = {0xAA,0x55,0x02,0xFE,0x01,0x00}; // 电流读取指令 AA 55 02 FE 01 00 
-  72                                                                                                                                                          //04 55 02 FE 01 00 
-  73          static UINT32 adc_count = 0;
-  74          void chk_power_on_again(void);
-  75          
-  76          
-  77          /* ---------- 定义2/3(函数) --------------*/
-  78          
-  79                  /* ---------- 函数类1/4(中断) --------------*/
-  80          
+  51          static unsigned int charge_current = 0;                 // 充电电流
+  52          static unsigned int short_current = 0;          // 充电电流
+  53          static bit pass = 1;                    // 测试结果
+  54          static bit testing = 0;                 // 测试中的标记
+  55          static bit power_offed= 0;                      // 充电器退出标记(它仅有ADC控制)
+  56          static bit power_on= 0;                 // 充电器接上标记 (表示可进入测试状态，在jugement后置0)
+  57          static bit first_boot= 1;                       // 充电器接上标记
+  58          static bit get_current_ok= 0;                   // 已测试电流标记
+  59          static bit time_out= 0;                         // 等待中断取数据超时
+  60          static bit recovery_ok= 0;                      // 复归确认标记
+  61          static bit adcv_ok = 0;
+  62          static bit this_comp_low= 0;
+  63          static bit last_comp_low= 0;
+  64          static bit this_comp_hi= 0;
+  65          static bit last_comp_hi= 0;
+  66          static bit bat_out_ok= 0;
+  67          static bit bat_down_ok= 0;
+  68          
+  69          static UINT8 order = 0;
+  70          static UINT8 timer0_couter = 0;
+  71          static UINT8 current_val[8] ={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  72          static UINT8 adc_res[3] = {0x00,0x00, 0x00};
+  73          static UINT8 cmd[6] = {0xAA,0x55,0x02,0xFE,0x01,0x00}; // 电流读取指令 AA 55 02 FE 01 00 
+  74                                                                                                                                                          //04 55 02 FE 01 00 
+  75          static UINT32 adc_count = 0;
+  76          static UINT8  test_couter = 0;   // 充电电流测试次数
+  77          
+  78          void chk_power_on_again(void);
+  79          /* ---------- 定义2/3(函数) --------------*/
+  80                  /* ---------- 函数类1/4(中断) --------------*/
   81          void timer0_interrupt() interrupt 1 {
   82   1        // 停止ADC/串口工作，pass = 0, 设置 get_current_ok / recovery_ok = 1
   83   1              // timer 0 全开最大50mS；需要3秒，要60个循环。
@@ -108,371 +110,453 @@ line level    source
   94   2              }
   95   1      }
   96          
-  97          void adc_interrupt() interrupt 11 {             
-  98   1              adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
-  99   1              //F1: 未在测试状态, 充电器再次插入检测
- 100   1              if(~testing){                                   //开始测试前，插入电源检测用此段
- 101   2                      chk_power_on_again();
- 102   2              }
- 103   1              else{                                                   // 电池输出检测, 等待操作员按钮，没有超时限制
- 104   2                      if(adc_val>DCV_BAT && P13 == 1 ){                       //  放电的下降值，和电池的检测值 ，用同样的4.5V�
-             -�p13=CHARGE 常闭打开，不充电
- 105   3      
- 106   3                              if(adc_count > 50000){                                  // 1.5秒持续高
- 107   4                                      adc_count = 0;
- 108   4                                      bat_out_ok = 1;
- 109   4                                      clr_ADCEN;                              //      开始测试，停用ADC
- 110   4                              }
- 111   3                              else{
- 112   4                              adc_count++;
- 113   4                                      clr_ADCF; set_ADCS;             //没有复归，接着ADC检测                                
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 3   
+  97          void ifBatOut(){
+  98   1              if(adc_val > DCV_BAT && P13 == 1 ){            //未短路状态下             //  放电的下降值，和电池的检
+             -测值 ，用同样的4.5V。p13=CHARGE 常闭打开，不充电
+  99   2                      if(adc_count > 50000){                                  // 1.5秒持续高
+ 100   3                              adc_count = 0;
+ 101   3                              bat_out_ok = 1;
+ 102   3                              clr_ADCEN;                              //      开始测试，停用ADC
+ 103   3                      }
+ 104   2                      else{
+ 105   3                              adc_count++;
+ 106   3                              clr_ADCF; set_ADCS;             //没有复归，接着ADC检测                                
+ 107   3                      }
+ 108   2              }
+ 109   1              else {
+ 110   2                      clr_ADCF; set_ADCS;             //没有复归，接着ADC检测
+ 111   2              }
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 3   
 
- 114   4                              }
- 115   3                      }
- 116   2                      else {
- 117   3                              clr_ADCF; set_ADCS;             //没有复归，接着ADC检测
- 118   3                      }
- 119   2      
- 120   2              }                                                               
- 121   1              // ADC的最后状态由if段内部case决定
- 122   1      }
- 123          
- 124          // 获取电流值 UART0 中断
- 125          void uart0_interrupt() interrupt 4 {
- 126   1        if(RI){
- 127   2              if (order > 7)
- 128   2                      order = 0;
- 129   2          current_val[order] = Receive_Data_From_UART0();;  // 获取电流结果
- 130   2          //Send_Data_To_UART1( current_val[order]);
- 131   2          if(order == 7){
- 132   3            order = 0;
- 133   3            get_current_ok =1;
- 134   3          }
- 135   2          else {
- 136   3            order ++;
- 137   3          }
- 138   2          clr_RI;
- 139   2        }
- 140   1      
- 141   1        if(TI){
- 142   2              clr_TI;
- 143   2        }
- 144   1      }
- 145          
- 146          void uart1_interrup(void) interrupt 15 {
- 147   1        if(TI_1){
- 148   2          clr_TI_1;
- 149   2        }
- 150   1      }
- 151          
- 152                  /* ---------- 函数类2/3(配置) --------------*/
- 153          void chk_power_on_again(){
- 154   1              // 测试结束，要拔掉电源，才能有以下动作
- 155   1              // 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
- 156   1              if (first_boot && (adc_val > DCV_ON )){                 //case 1: 开机时有电源 -> 可以马上开始测试
- 157   2                      power_on = 1;
- 158   2                      CHARGE_ON;
- 159   2                      //SBUF=0X11;
- 160   2                      clr_ADCEN;                      // 开始测试，停用ADC
- 161   2              }
- 162   1              else {                                                                          //case 2: 开机时无电源 -> 同一般情况 ->先检测有低，再检测有高
- 163   2      
- 164   2                      if (~power_offed && adc_val < DCV_OFF ){                                        //              判断poweroffed的两种情况
- 165   3                              this_comp_low = 1;
- 166   3                              if(this_comp_low != last_comp_low){             // 要防错抖动, 与上次不同就要重新计数
- 167   4                                      adc_count =0;
- 168   4                              }
- 169   3                              else
- 170   3                                      adc_count ++;
- 171   3                              if(adc_count > 50000){                          // 1.5秒内一直小电压, 保证拔掉充电器时，接触不良有高�
-             -�压误判而 restJugement
- 172   4                                      power_offed = 1;        
- 173   4                                      adc_count = 0;
- 174   4                              }                               
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 4   
+ 112   1      }
+ 113          
+ 114          void ifBatDown(){
+ 115   1              if(adc_val < DCV_BAT_DOWN && P13 == 1 ){               //短路状态下, 电池电压1V以下          
+ 116   2                      if(adc_count > 50000){                                  // 1.5秒持续高
+ 117   3                              adc_count = 0;
+ 118   3                              bat_down_ok = 1;
+ 119   3                              clr_ADCEN;                              //      开始测试，停用ADC
+ 120   3                      }
+ 121   2                      else{
+ 122   3                              adc_count++;
+ 123   3                              clr_ADCF; set_ADCS;             //没有复归，接着ADC检测                                
+ 124   3                      }
+ 125   2              }
+ 126   1              else {
+ 127   2                      clr_ADCF; set_ADCS;             //没有复归，接着ADC检测
+ 128   2              }
+ 129   1      }
+ 130          
+ 131          void adc_interrupt() interrupt 11 {             
+ 132   1              adc_val= ADCRH; adc_val<<= 4; adc_val|= (ADCRL & 0X0F);  // 16h -> dec
+ 133   1              //F1: 未在测试状态, 充电器再次插入检测
+ 134   1              if(~testing){                                   //开始测试前，插入电源检测用此段
+ 135   2                      chk_power_on_again();
+ 136   2              }
+ 137   1              else{                                   // 电池输出检测, 或电池被短路
+ 138   2                      /*
+ 139   2                      // 用于只检测电池电压上升
+ 140   2                      if(adc_val > DCV_BAT && P13 == 1 ){        // 放电的下降值，和电池的检测值 ，用同样的4.5V
+             -。p13=CHARGE 常闭打开，不充电
+ 141   2                              if(adc_count > 50000){                                  // 1.5秒持续高
+ 142   2                                      adc_count = 0;
+ 143   2                                      bat_out_ok = 1;
+ 144   2                                      clr_ADCEN;                              //      开始测试，停用ADC
+ 145   2                              }
+ 146   2                              else{
+ 147   2                                      adc_count++;
+ 148   2                                      clr_ADCF; set_ADCS;             //没有复归，接着ADC检测                                
+ 149   2                              }
+ 150   2                      }
+ 151   2                      else {
+ 152   2                              clr_ADCF; set_ADCS;             //没有复归，接着ADC检测
+ 153   2                      }
+ 154   2                      */
+ 155   2      
+ 156   2                      // 用于电池电压上升和下降的检测
+ 157   2                      if(P12 == 0) 
+ 158   2                              ifBatOut();             // 未短路时检测电池有输出            
+ 159   2                      else
+ 160   2                              ifBatDown();            // 短路时检测电池有下降
+ 161   2              }                                                               
+ 162   1              // ADC的最后状态由if段内部case决定
+ 163   1      }
+ 164          
+ 165          // 获取电流值 UART0 中断
+ 166          void uart0_interrupt() interrupt 4 {
+ 167   1        if(RI){
+ 168   2              if (order > 7)
+ 169   2                      order = 0;
+ 170   2          current_val[order] = Receive_Data_From_UART0();;  // 获取电流结果
+ 171   2          //Send_Data_To_UART1( current_val[order]);
+ 172   2          if(order == 7){
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 4   
 
- 175   3                      }
- 176   2                      else{
- 177   3                              this_comp_low = 0;
- 178   3                      }
- 179   2                      last_comp_low = this_comp_low;
- 180   2      
- 181   2                      // ------------ 以上为确认有效的power_offed, 供下面用-------------------
- 182   2      
- 183   2                      if(power_offed && (adc_val > DCV_ON)){   //             由power_offed的决定是否 power_on
- 184   3                              this_comp_hi = 1;
- 185   3                              if(this_comp_hi != last_comp_hi){               // 要防错抖动, 与上次不同就要重新计数
- 186   4                                      adc_count =0;
- 187   4                              }
- 188   3                              else
- 189   3                                      adc_count ++;
- 190   3                              if(adc_count > 50000){                          // 1.5秒内一直小电压, 保证拔掉充电器时，接触不良有高�
-             -�压误判而 restJugement
- 191   4                                      power_on = 1;   
- 192   4                                      CHARGE_ON;
- 193   4                                      adc_count = 0;
- 194   4                                      clr_ADCEN;                      // 开始测试，停用ADC     
- 195   4                              }                               
- 196   3                      }
- 197   2                      else{
- 198   3                              this_comp_hi = 0;
- 199   3                      }
- 200   2                      last_comp_hi = this_comp_hi;
- 201   2      
- 202   2                      // ------------ 以上为确认有效的power_on, 供下面用-------------------
- 203   2      
- 204   2                      if(~power_on){                                                  // 以上没有产生有效的power_on, 继续ADC
- 205   3                              clr_ADCF; set_ADCS;
- 206   3                      }
- 207   2              }
- 208   1      }
- 209          
- 210          void ioConf(){
- 211   1              //  准双向，已经在串口初始化定义
- 212   1              //串口1  p06 / p07
- 213   1              //串口2  p16 /p02
- 214   1      
- 215   1              P10_PushPull_Mode;                      // Relay 1 control - for ok -> p10
- 216   1              P11_PushPull_Mode;                      // Relay 2 control - for ng -> p11
- 217   1              P12_PushPull_Mode;                      // Relay 3 control - for short -> p12
- 218   1              P13_PushPull_Mode;                      // Relay 4 control - for charge -> p13
- 219   1              P03_Quasi_Mode;                         // ng_reset
- 220   1              P04_Quasi_Mode;                         // sys_reset
- 221   1              set_P03;
- 222   1              set_P04;
- 223   1      
- 224   1      
- 225   1              Enable_ADC_AIN0;                        // AIN0 P17
- 226   1      
- 227   1              set_PWMDIV0;                            // pwm 128分频率
- 228   1              set_PWMDIV1;
- 229   1              set_PWMDIV2;
- 230   1      }
- 231          
- 232          
- 233                  /* ---------- 函数类3/3(功能) --------------*/
- 234          
- 235           void timer0_monitor_start(){
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 5   
+ 173   3            order = 0;
+ 174   3            get_current_ok =1;
+ 175   3          }
+ 176   2          else {
+ 177   3            order ++;
+ 178   3          }
+ 179   2          clr_RI;
+ 180   2        }
+ 181   1      
+ 182   1        if(TI){
+ 183   2              clr_TI;
+ 184   2        }
+ 185   1      }
+ 186          
+ 187          void uart1_interrup(void) interrupt 15 {
+ 188   1        if(TI_1){
+ 189   2          clr_TI_1;
+ 190   2        }
+ 191   1      }
+ 192          
+ 193                  /* ---------- 函数类2/3(配置) --------------*/
+ 194          void chk_power_on_again(){
+ 195   1              // 测试结束，要拔掉电源，才能有以下动作
+ 196   1              // 所以要先检查ADC 有一个低电压，之后再有一个高电压，才认为是有效的power_on
+ 197   1              if (first_boot && (adc_val > DCV_ON )){                 //case 1: 开机时有电源 -> 可以马上开始测试
+ 198   2                      power_on = 1;
+ 199   2                      CHARGE_ON;                      // 上电时执行 charge
+ 200   2                      //SBUF=0X11;
+ 201   2                      clr_ADCEN;                      // 开始测试，停用ADC
+ 202   2              }
+ 203   1              else {                                                                          //case 2: 开机时无电源 -> 同一般情况 ->先检测有低，再检测有高
+ 204   2      
+ 205   2                      if (~power_offed && adc_val < DCV_OFF ){                                        //              判断poweroffed的两种情况
+ 206   3                              this_comp_low = 1;
+ 207   3                              if(this_comp_low != last_comp_low){             // 要防错抖动, 与上次不同就要重新计数
+ 208   4                                      adc_count =0;
+ 209   4                              }
+ 210   3                              else
+ 211   3                                      adc_count ++;
+ 212   3                              //if(adc_count > 50000){                                // 1.5秒内一直小电压, 保证拔掉充电器时，接触不良有高
+             -电压误判而 restJugement
+ 213   3                              if(adc_count > 33333){                          // 1秒内一直小电压, 保证拔掉充电器时，接触不良有高电�
+             -��误判而 restJugement
+ 214   4                                      power_offed = 1;        
+ 215   4                                      adc_count = 0;
+ 216   4                              }                               
+ 217   3                      }
+ 218   2                      else{
+ 219   3                              this_comp_low = 0;
+ 220   3                      }
+ 221   2                      last_comp_low = this_comp_low;
+ 222   2      
+ 223   2                      // ------------ 以上为确认有效的power_offed, 供下面用-------------------
+ 224   2      
+ 225   2                      if(power_offed && (adc_val > DCV_ON)){   //             由power_offed的决定是否 power_on
+ 226   3                              this_comp_hi = 1;
+ 227   3                              if(this_comp_hi != last_comp_hi){               // 要防错抖动, 与上次不同就要重新计数
+ 228   4                                      adc_count =0;
+ 229   4                              }
+ 230   3                              else
+ 231   3                                      adc_count ++;
+ 232   3                              //if(adc_count > 50000){                                // 1.5秒内一直小电压, 保证拔掉充电器时，接触不良有高
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 5   
 
- 236   1              // 配置定时期初值
- 237   1              // 开启定时器  -- > 定时器溢出时，在中断中处理：停止测试，错误输出
- 238   1              time_out=0;
- 239   1              order = 0;
- 240   1          clr_T0M;                                            //T0M=0, Timer0 Clock = Fsys/12
- 241   1          TMOD |= 0x01;                                       //Timer0 is 16-bit mode
- 242   1          TL0 = 0x00;
- 243   1          TH0 = 0x00;
- 244   1          set_ET0;
- 245   1          set_TR0;
- 246   1       }
- 247          
- 248           void timer0_monitor_stop(){
- 249   1              // 关闭定时器
- 250   1              TR0 = 0;
- 251   1              clr_ET0;        
- 252   1              // 重置定时器的值
- 253   1       }
- 254          
- 255          void reset_judgement(){
- 256   1              OK_OFF; NG_OFF; // ok Relay =0 ; ng Relay = 0;
- 257   1      }
- 258          
- 259          void do_a_judgement(){
- 260   1              //CHARGE_OFF;
- 261   1              CHARGE_ON;
- 262   1              // Timer0_Delay1ms(100);
- 263   1              // 1. 输出测试结果(先置0再置1, 防止两个同时有效）
- 264   1              if(pass){
- 265   2                      NG_OFF; 
- 266   2                      OK_ON;
- 267   2              }
- 268   1              else {
- 269   2                      OK_OFF; 
- 270   2                      NG_ON;
- 271   2              }
- 272   1              // 2. 设测试结束标记 & 待开始新一轮充电插入检测
- 273   1              first_boot = 0;
- 274   1              testing = 0;
- 275   1              power_on = 0; 
- 276   1              power_offed = 0;
- 277   1      
- 278   1              // 3. 重新开始ADC侦测(开启ADC中断)
- 279   1              set_ADCEN;
- 280   1              set_ADCS;
- 281   1      }
- 282          
- 283          void send_cmd(){
- 284   1        UINT8 order = 0;
- 285   1        while (order <= 5){
- 286   2          Send_Data_To_UART0(cmd[order]);
- 287   2         order ++;
- 288   2        }
- 289   1      }
+             -电压误判而 restJugement
+ 233   3                              if(adc_count > 33333){                          // 1秒内一直小电压, 保证拔掉充电器时，接触不良有高电�
+             -��误判而 restJugement
+ 234   4                                      power_on = 1;   
+ 235   4                                      CHARGE_ON;                              // 上电时执行charge
+ 236   4                                      adc_count = 0;
+ 237   4                                      clr_ADCEN;                      // 开始测试，停用ADC     
+ 238   4                              }                               
+ 239   3                      }
+ 240   2                      else{
+ 241   3                              this_comp_hi = 0;
+ 242   3                      }
+ 243   2                      last_comp_hi = this_comp_hi;
+ 244   2      
+ 245   2                      // ------------ 以上为确认有效的power_on, 供下面用-------------------
+ 246   2      
+ 247   2                      if(~power_on){                                                  // 以上没有产生有效的power_on, 继续ADC
+ 248   3                              clr_ADCF; set_ADCS;
+ 249   3                      }
+ 250   2              }
+ 251   1      }
+ 252          
+ 253          void ioConf(){
+ 254   1              //  准双向，已经在串口初始化定义
+ 255   1              //串口1  p06 / p07
+ 256   1              //串口2  p16 /p02
+ 257   1      
+ 258   1              P10_PushPull_Mode;                      // Relay 1 control - for ok -> p10
+ 259   1              P11_PushPull_Mode;                      // Relay 2 control - for ng -> p11
+ 260   1              P12_PushPull_Mode;                      // Relay 3 control - for short -> p12
+ 261   1              P13_PushPull_Mode;                      // Relay 4 control - for charge -> p13
+ 262   1              P03_Quasi_Mode;                         // sys_reset (changed: 电池开信号输入)
+ 263   1              P04_Quasi_Mode;                         // ng_reset
+ 264   1              set_P03;
+ 265   1              set_P04;
+ 266   1      
+ 267   1      
+ 268   1              Enable_ADC_AIN0;                        // AIN0 P17
+ 269   1      
+ 270   1              set_PWMDIV0;                            // pwm 128分频率
+ 271   1              set_PWMDIV1;
+ 272   1              set_PWMDIV2;
+ 273   1      }
+ 274          
+ 275          
+ 276                  /* ---------- 函数类3/3(功能) --------------*/
+ 277          
+ 278           void timer0_monitor_start(){
+ 279   1              // 配置定时期初值
+ 280   1              // 开启定时器  -- > 定时器溢出时，在中断中处理：停止测试，错误输出
+ 281   1              time_out=0;
+ 282   1              order = 0;
+ 283   1          clr_T0M;                                            //T0M=0, Timer0 Clock = Fsys/12
+ 284   1          TMOD |= 0x01;                                       //Timer0 is 16-bit mode
+ 285   1          TL0 = 0x00;
+ 286   1          TH0 = 0x00;
+ 287   1          set_ET0;
+ 288   1          set_TR0;
+ 289   1       }
  290          
- 291          void test_flow(){
- 292   1        int tempV = 0;
- 293   1        float current = 0;
- 294   1        float re_dcv = 0;
- 295   1        pass = 1;
- 296   1              testing = 1;                    // 标记进入测试中
- 297   1              reset_judgement();              // 进入测试状诚后，OK/NG继电器复位
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 6   
+ 291           void timer0_monitor_stop(){
+ 292   1              // 关闭定时器
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 6   
 
- 298   1      
- 299   1        // -----------------------------------------------RATE
- 300   1        Timer0_Delay1ms(7000);        // Rating current
- 301   1        get_current_ok = 0;
- 302   1        timer0_monitor_start();
- 303   1        send_cmd();
- 304   1              while(~get_current_ok && ~time_out);    // Waiting A meter return
- 305   1        timer0_monitor_stop();
- 306   1        if(time_out){
- 307   2              pass= 0;
- 308   2        }
- 309   1        if(get_current_ok){
- 310   2              tempV = current_val[5]; tempV <<= 8; tempV |= (current_val[4] & 0xFF);
- 311   2              //current =(float) ( (current_val[5] *  256 + current_val[4])/1000 );
- 312   2        }
- 313   1        if(~pass || tempV < 0x01F4){  // < 0.5A
- 314   2        //if(~pass || tempV < 0x044c){  // < 1.1A
- 315   2        // if(~pass || tempV < 0x03e8){  // < 1.0A
- 316   2        //if(~pass || tempV < 0x0384){  // < .90A  
- 317   2              //发送定格有问题0xF1, 检测NG波形 和short波形
- 318   2          pass = 0; do_a_judgement(); 
- 319   2          return;   // ----> return
- 320   2        }
- 321   1        // -----------------------------------------------SHORT
- 322   1        // 切断充电器
- 323   1        // 手动开机
- 324   1        //  短路
- 325   1        CHARGE_OFF;
- 326   1        Timer0_Delay1ms(1500); //保留看电流的时间
- 327   1        // Whaiting for bat. output by manule
- 328   1        SHORT_ON;
- 329   1        Timer0_Delay1ms(300); //保留看电流的时间
- 330   1        SHORT_OFF;
- 331   1      
- 332   1        set_ADCEN; clr_ADCF;
- 333   1        set_ADCS; set_ADCEN;
- 334   1        //此时电压值 > 4.8V < 8V,持续1秒钟，表示BAT,OK
- 335   1        bat_out_ok =0;
- 336   1        while(~bat_out_ok);
- 337   1       SHORT_ON;             // shorted
- 338   1        Timer0_Delay1ms(2000); //保留看电流的时间
- 339   1      
- 340   1        get_current_ok = 0;
- 341   1        timer0_monitor_start();
- 342   1        send_cmd();
- 343   1              while(~get_current_ok && ~time_out);    // Waiting A meter return
- 344   1        timer0_monitor_stop();
- 345   1        if(time_out){
- 346   2              pass= 0;
- 347   2        }
- 348   1        if(get_current_ok){
- 349   2              tempV = current_val[5]; tempV <<= 8; tempV |= (current_val[4] & 0xFF);
- 350   2        } 
- 351   1        //tempV = 0x0003;
- 352   1        //pass = 1;
- 353   1        if(~pass || tempV > 0x0014){  // < 0.02A
- 354   2              Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
- 355   2          pass = 0; do_a_judgement(); SHORT_OFF; return; // ---> return (ng shorted cancel)
- 356   2        }
- 357   1      
- 358   1      
- 359   1        // ----------------------------------------------- Output Recovery
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 7   
+ 293   1              TR0 = 0;
+ 294   1              clr_ET0;        
+ 295   1              // 重置定时器的值
+ 296   1       }
+ 297          
+ 298          void reset_judgement(){
+ 299   1          SHORT_OFF;     // 最后无论OK、NG都保持短路状态，仅在此还原
+ 300   1              OK_OFF; NG_OFF; // ok Relay =0 ; ng Relay = 0;
+ 301   1              Timer0_Delay1ms(50);
+ 302   1              CHARGE_ON;              // 最后无论OK、NG的判定进行复位，要进行测试，总是从充电开始
+ 303   1      }
+ 304          
+ 305          void do_a_judgement(){
+ 306   1              //CHARGE_OFF;
+ 307   1              // Timer0_Delay1ms(100);
+ 308   1              // 1. 输出测试结果(先置0再置1, 防止两个同时有效）
+ 309   1              if(pass){
+ 310   2                      NG_OFF; 
+ 311   2                      OK_ON;
+ 312   2              }
+ 313   1              else {
+ 314   2                      OK_OFF; 
+ 315   2                      NG_ON;
+ 316   2              }
+ 317   1              // 2. 设测试结束标记 & 待开始新一轮充电插入检测
+ 318   1              first_boot = 0;
+ 319   1              testing = 0;
+ 320   1              power_on = 0; 
+ 321   1              power_offed = 0;
+ 322   1      
+ 323   1              // 3. 重新开始ADC侦测(开启ADC中断)
+ 324   1              set_ADCEN;
+ 325   1              set_ADCS;
+ 326   1      
+ 327   1      
+ 328   1      }
+ 329          
+ 330          void send_cmd(){
+ 331   1        UINT8 order = 0;
+ 332   1        while (order <= 5){
+ 333   2          Send_Data_To_UART0(cmd[order]);
+ 334   2         order ++;
+ 335   2        }
+ 336   1      }
+ 337          
+ 338          void test_flow(){
+ 339   1              int tempV = 0;
+ 340   1              pass = 1;
+ 341   1              testing = 1;                    // 标记进入测试中
+ 342   1              reset_judgement();              // 进入测试状诚后，OK/NG/short继电器复位
+ 343   1      
+ 344   1              // -----------------------------------------------RATE 充电电流测试
+ 345   1              // 0x00c8 <0.2A  0x012c< 0.3A 0x01F4< 0.5A 0x044c< 1.1A
+ 346   1              // 公式 256 * 高8位 + 244（低8位所转） = 500 mA (0x01F4)
+ 347   1      
+ 348   1              Timer0_Delay1ms(1000);  // 初次等待1s
+ 349   1              // 循环测电流
+ 350   1              test_couter = 0;
+ 351   1              while( pass && test_couter < 35){                       // 有一项为0 ，即为0（与）35次，约测10秒 
+ 352   2                get_current_ok = 0;
+ 353   2                timer0_monitor_start();
+ 354   2                send_cmd();
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 7   
 
- 360   1        /*
- 361   1        CHARGE_ON;            //利用（ADC: testing ==1 || P13 ==0) 
- 362   1        Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
- 363   1       set_ADCEN; clr_ADCF;
- 364   1        set_ADCS; set_ADCEN;
- 365   1        //此时电压值 > 4.8V < 8V,持续1秒钟，表示BAT,OK
- 366   1        recovery_ok =0;
- 367   1        while(~recovery_ok);
- 368   1        if(~pass){  // < 0.02A
- 369   1              Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
- 370   1          pass = 0; do_a_judgement(); SHORT_OFF; return; // ---> return (ng shorted cancel)
- 371   1        }   
- 372   1              */
- 373   1        SHORT_OFF; //OK shorted cancel
- 374   1        do_a_judgement();
- 375   1      }
- 376          
- 377          void sys_reset(){
- 378   1              set_SWRST;      
- 379   1      }
- 380          
- 381          void ng_relay_reset(){
- 382   1              NG_OFF;
- 383   1      }
- 384          
- 385          
- 386          /*
- 387          流程说明：
- 388          上电检查有没有输出
- 389          输出有，用relay 接上电池
- 390          等待8秒 （常量）
- 391          */
- 392          void main(){
- 393   1              // 初始化
- 394   1              ioConf();       
- 395   1              OK_OFF;
- 396   1              NG_OFF;
- 397   1              SHORT_OFF;
- 398   1              CHARGE_ON;
- 399   1        Timer0_Delay1ms(1000);
+ 355   2                while(~get_current_ok && ~time_out);  // 即没得到电流，又没超时一直等
+ 356   2                timer0_monitor_stop();
+ 357   2                if(time_out)
+ 358   2                      pass= 0;
+ 359   2                if(get_current_ok)                                    // 取得电流
+ 360   2                      tempV = current_val[5]; tempV <<= 8; tempV |= (current_val[4] & 0xFF);
+ 361   2                if (tempV > 0x00c8)           
+ 362   2                  break;                                                              // 如果电流值输出OK，保证不再为电流赋新值
+ 363   2                else
+ 364   2                      test_couter ++;
+ 365   2                 Timer0_Delay1ms(350);                                // 下一个重复的间隔（电流表的采样率为每秒3次)
+ 366   2              }
+ 367   1        
+ 368   1              // 循环多次测得的结果判定
+ 369   1              if(~pass || tempV < 0x00c8){  
+ 370   2                      pass = 0;                               
+ 371   2              do_a_judgement();       // NG 判定输出
+ 372   2              return;   
+ 373   2              }
+ 374   1       
+ 375   1        // -----------------------------------------------SHORT 短路电流测试
+ 376   1        CHARGE_OFF;
+ 377   1        Timer0_Delay1ms(1500);                 // 断开充电并延迟0.6s -> 1.5s
+ 378   1      
+ 379   1              /* 方案1 */
+ 380   1        /*
+ 381   1        SHORT_ON;                                              // 执行放电与短路 -> 移至获得信号后
+ 382   1        OK_ON; Timer0_Delay1ms(1000); OK_OFF; // 发出OK指示 1s
+ 383   1         while (P03);
+ 384   1         Timer0_Delay1ms(2000);            // 延迟2s 
+ 385   1      */
+ 386   1              /* 方案2 */
+ 387   1              // 放开充电->给出1秒OK信号(同时放电0.5秒)->得到回复后->检验电池电压升起->执�
+             -�短路->检验电池电压下降 -> 测电流        
+ 388   1        //SHORT_ON;   
+ 389   1        OK_ON;
+ 390   1        Timer0_Delay1ms(500);
+ 391   1        //SHORT_OFF;   // 放电0.5s
+ 392   1        Timer0_Delay1ms(500); 
+ 393   1        OK_OFF; // 发出OK指示 1s
+ 394   1      
+ 395   1         while (P03);
+ 396   1        
+ 397   1         bat_out_ok = 0;
+ 398   1        set_ADCEN; clr_ADCF; set_ADCS; set_ADCEN;
+ 399   1        while(~bat_out_ok);    //此时电压值 > 4.8V < 8V,持续1秒钟，表示BAT,OK
  400   1      
- 401   1              set_ES;
- 402   1              set_REN;
- 403   1              set_EADC;
- 404   1      
- 405   1      
- 406   1              clr_ADCF;
- 407   1              set_ADCEN;
- 408   1              set_ADCS;
+ 401   1        SHORT_ON;             // 电池开启 －〉 shorted － 〉 电池电压下降 － 〉 测短路电流
+ 402   1      
+ 403   1        bat_down_ok = 0;    // 短路测试不等电压下降
+ 404   1        set_ADCEN; clr_ADCF; set_ADCS; set_ADCEN;
+ 405   1        while(~bat_down_ok);   //此时电压值 > 1V,持续1秒钟，表示短路有效
+ 406   1      
+ 407   1        Timer0_Delay1ms(1000);   //查看会不会显示"E"
+ 408   1      
  409   1      
- 410   1              set_EA; 
- 411   1      
- 412   1      
- 413   1              InitialUART0_Timer1(115200);
- 414   1              //InitialUART1_Timer3(115200);
- 415   1      
- 416   1              while (1){
- 417   2                      //if(~testing && power_on){
- 418   2                      if(power_on){
- 419   3                              testing = 1;  // 标记进入测试中
- 420   3                              clr_ADCEN;
- 421   3                              test_flow();
-C51 COMPILER V9.02   MAIN                                                                  06/24/2018 09:18:16 PAGE 8   
+ 410   1      /* 测试电流辨别OK */
+ 411   1        get_current_ok = 0;
+ 412   1        timer0_monitor_start();
+ 413   1        send_cmd();
+ 414   1              while(~get_current_ok && ~time_out);    // Waiting A meter return
+ 415   1        timer0_monitor_stop();
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 8   
 
- 422   3                      }
- 423   2                      Timer0_Delay1ms(500);
- 424   2      
- 425   2                      if(P03 == 0){
- 426   3                              ng_reset();
-*** WARNING C206 IN LINE 426 OF CODE\MAIN.C: 'ng_reset': missing function-prototype
- 427   3                      }
- 428   2      
- 429   2                      if(P04 == 0) {
- 430   3                              sys_reset();
- 431   3                      }
- 432   2              
- 433   2              }
- 434   1      }
+ 416   1        if(time_out){
+ 417   2              pass= 0;
+ 418   2        }
+ 419   1        if(get_current_ok){
+ 420   2              tempV = current_val[5]; tempV <<= 8; tempV |= (current_val[4] & 0xFF);
+ 421   2        } 
+ 422   1        //tempV = 0x0003;
+ 423   1        //pass = 1;
+ 424   1        if(~pass || tempV > 0x0014){  // < 0.02A
+ 425   2              Timer0_Delay1ms(1500); //保留看电流的时间 1500ms *2 =3s
+ 426   2          pass = 0; do_a_judgement(); 
+ 427   2          //SHORT_OFF;                  // 无论OK、NG都保持短路状态
+ 428   2          Timer0_Delay1ms(1000);      
+ 429   2          SHORT_OFF;
+ 430   2              Timer0_Delay1ms(200);   
+ 431   2              CHARGE_ON;                              //做OK、NG的判后改变charge ON, 让输入有感知
+ 432   2          return; // ---> return (ng shorted cancel)
+ 433   2        }
+ 434   1      
+ 435   1          SHORT_OFF; Timer0_Delay1ms(100); CHARGE_ON; // Relay 复位后，再点OK灯
+ 436   1          do_a_judgement();
+ 437   1      
+ 438   1      }
+ 439          
+ 440          void sys_reset(){
+ 441   1              set_SWRST;      
+ 442   1      }
+ 443          
+ 444          void ng_reset(){
+ 445   1              NG_OFF;
+ 446   1      }
+ 447          /*
+ 448          流程说明：
+ 449          上电检查有没有输出
+ 450          输出有，用relay 接上电池
+ 451          等待8秒 （常量）
+ 452          */
+ 453          void main(){
+ 454   1      
+ 455   1               /*IAP 写保护 */
+ 456   1              set_IAPEN;  //启用IAP
+ 457   1              set_CFUEN;      // 要更新config区域
+ 458   1              IAPAH = 0x00; //cfg0 地址为 0000h       
+ 459   1              IAPAL = 0x00;
+ 460   1              IAPFD = 0xFD; //CFG0 的数据
+ 461   1              IAPCN = 0XE1; //CFG 写
+ 462   1              set_IAPGO; // 开始执行IAP
+ 463   1              clr_IAPEN;
+ 464   1      
+ 465   1      
+ 466   1              // 初始化
+ 467   1              ioConf();       
+ 468   1              OK_OFF;
+ 469   1              NG_OFF;
+ 470   1              SHORT_OFF;
+ 471   1              CHARGE_ON;                              //开机default charge
+ 472   1         Timer0_Delay1ms(1000);
+ 473   1      
+ 474   1              set_ES;
+ 475   1              set_REN;
+ 476   1              set_EADC;
+ 477   1      
+C51 COMPILER V9.02   MAIN                                                                  09/22/2018 14:29:55 PAGE 9   
+
+ 478   1      
+ 479   1              clr_ADCF;
+ 480   1              set_ADCEN;
+ 481   1              set_ADCS;
+ 482   1      
+ 483   1              set_EA; 
+ 484   1      
+ 485   1      
+ 486   1              InitialUART0_Timer1(115200);
+ 487   1              //InitialUART1_Timer3(115200);
+ 488   1      
+ 489   1              while (1){
+ 490   2                      if(power_on){
+ 491   3                              testing = 1;  
+ 492   3                              clr_ADCEN;
+ 493   3                              test_flow();  //开始一轮测试
+ 494   3                      }
+ 495   2                      Timer0_Delay1ms(500);
+ 496   2      
+ 497   2                      /* 两个复位信号 */
+ 498   2                      if(P04 == 0){
+ 499   3                              if(P11 ==1 )    // 当NG生效时
+ 500   3                                      ng_reset();    // NG复位
+ 501   3                              else
+ 502   3                                      sys_reset();   // 系统复位
+ 503   3                      }
+ 504   2      
+ 505   2                      /*
+ 506   2                      if(P03 == 0) {
+ 507   2                              sys_reset();
+ 508   2                      }
+ 509   2                      */
+ 510   2              }
+ 511   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   1053    ----
+   CODE SIZE        =   1337    ----
    CONSTANT SIZE    =   ----    ----
    XDATA SIZE       =   ----    ----
    PDATA SIZE       =   ----    ----
-   DATA SIZE        =     35      11
+   DATA SIZE        =     38       3
    IDATA SIZE       =   ----    ----
-   BIT SIZE         =     14    ----
+   BIT SIZE         =     15    ----
 END OF MODULE INFORMATION.
 
 
-C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

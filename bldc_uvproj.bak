@@ -353,6 +353,21 @@
             </File>
           </Files>
         </Group>
+        <Group>
+          <GroupName>comm</GroupName>
+          <Files>
+            <File>
+              <FileName>Common.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Libs\Common\Common.c</FilePath>
+            </File>
+            <File>
+              <FileName>Delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Libs\Common\Delay.c</FilePath>
+            </File>
+          </Files>
+        </Group>
       </Groups>
     </Target>
   </Targets>
