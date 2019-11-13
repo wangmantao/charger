@@ -45,7 +45,8 @@ log
 /* ---------- 定义2/3(变量) --------------*/
 static unsigned int DCV_OFF = 1228; 		// 电压输入有没有下限 (4.5v) (4.5/3v)/5v *4095 (因为取样分压1/3)
 static unsigned int DCV_ON = 1638; 		// 电压输入有没有上限 (6v) (6/3v)/5v *4095 (因为取样分压1/3)
-static unsigned int DCV_BAT = 1092; 		// battery (4v) (4/3v)/5v *4095 (因为取样分压1/3)--开启检验用
+static unsigned int DCV_BAT = 1092; 		// battery (4v) (4/3v)/5v *4095 (因为取样分压1/3)--开启检验用 // 1092对应1.3V, 当充电电压是5v时（5/3=1.6v)
+//static unsigned int DCV_BAT = 10; 		// 控制板性能实验，让它感知较低的电压开始工作
 static unsigned int adc_val = 0; 		// adc取样值
 //static unsigned int charge_current = 0; 		// 充电电流
 //static unsigned int short_current = 0; 		// 充电电流
@@ -391,6 +392,8 @@ void do_a_judgement(){
 	if(pass){
 		NG_OFF; 
 		OK_ON;
+		Timer0_Delay1ms(1000); OK_OFF;  //1s OK信号复0 2019-11-13
+
 	}
 	else {                // NG状况
 		OK_OFF; 
@@ -496,7 +499,7 @@ void test_flow(){
   	*/ 
 
 	// 次数上限 或 电流不足
-	if(test_couter >= test_max || tempV < 0x00c8){  
+	if(test_couter >= test_max || tempV < 0x00c8){  // 0.2A
   		pass = 0; 				
     	do_a_judgement(); 	// NG 判定输出
     	return;   
@@ -640,6 +643,7 @@ void start(){
 	NG_OFF;
 	SHORT_OFF;
 	CHARGE_ON;				//开机default charge
+
    Timer0_Delay1ms(1000);
 
 	set_ES;
